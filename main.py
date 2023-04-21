@@ -1,72 +1,35 @@
 import json
-import datetime
+from time import sleep
 from typing import Optional
 from fastapi import FastAPI, Depends, Path, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-import requests
-from bs4 import BeautifulSoup
-from pydantic import BaseModel
+
 from database import engineconn
 from models import NEWSROOM_USER,SCRAPE_KEYWORD,SCRAPED_NEWS
 from apiRes import ApiRes
+from crawling_news import crawling_news
+from utils.parse_datetime_str import parse_datetime_str
+
+
+#to-do : 무한 스크롤로 다음 페이지까지 다 긁어오기
 
 app = FastAPI()
 
 engine = engineconn()
 session = engine.sessionmaker()
 
-class NEWSROOM_USER_DATA(BaseModel):
-    company_id: str
-
-
-origins = [
-    "http://localhost.tiangolo.com",
-    "https://localhost.tiangolo.com",
-    "http://localhost",
-    "http://localhost:3000",
-    "*"
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True, # cookie 포함 여부를 설정한다. 기본은 False
     allow_methods=["*"],    # 허용할 method를 설정할 수 있으며, 기본값은 'GET'이다.
     allow_headers=["*"],	# 허용할 http header 목록을 설정할 수 있으며 Content-Type, Accept, Accept-Language, Content-Language은 항상 허용된다.
 )
-def parse_datetime_str(datetime_str):
-    dt = datetime.datetime.fromisoformat(datetime_str[:-1])
-    return dt.strftime('%Y-%m-%d %H:%M:%S')
 
-
-def crawling_news(keyword):
-    headers = {'User-Agent' : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36'}
-    data = requests.get(f'https://search.naver.com/search.naver?where=news&ie=utf8&sm=nws_hty&query={keyword}',headers=headers)
-
-    soup = BeautifulSoup(data.text, 'html.parser')
-
-    news_list = soup.select(".list_news>li")
-    news_dict_list = []
-    id = 0
-    for news in news_list:
-        id = id+1
-        news_dict = {}
-        news_dict.update(
-        {
-            "title":news.select_one("div.news_wrap.api_ani_send > div > a").text,
-            "summary":news.select_one("div.news_wrap.api_ani_send > div > div.news_dsc > div > a").text,
-            "broadcaster":news.select_one("div > div.news_info > div.info_group > a").text.replace("언론사 선정",""),
-            "broadcastTime":news.select_one("div > div.news_info > div.info_group > span.info").text,
-            "url":news.select_one("div.news_wrap.api_ani_send > div > a").attrs["href"],
-        }
-        )
-        news_dict_list.append(news_dict)
-    
-    
-    return news_dict_list  
 
 @app.get("/api/news/{keyword}")
 def response_crawled_news_list(keyword:str):
+ 
     api_res = ApiRes()
     result=''
 
@@ -82,10 +45,12 @@ def response_crawled_news_list(keyword:str):
 
 
 @app.post("/api/login")
-def login(user:NEWSROOM_USER_DATA):
+async def login(equest: Request):
 
     api_res = ApiRes()
-    company_id = user.company_id
+    request_body = await request.body()
+    data = json.loads(request_body)
+    company_id = data["company_id"]
     newsroom_user=''
 
     # 로그인 처리
@@ -113,7 +78,7 @@ def login(user:NEWSROOM_USER_DATA):
 
 
 @app.get("/api/keywordlist")
-def keywordlist(user_id):
+def keywordlist(user_id):       
 
     api_res = ApiRes()
     user_id = user_id
@@ -154,6 +119,7 @@ def scraped_news_list(keyword_id):
 
 @app.post("/api/scrape_news")
 async def scrape_news(request: Request):
+
     request_body = await request.body()
     data = json.loads(request_body)
     api_res = ApiRes()
@@ -191,10 +157,11 @@ async def scrape_news(request: Request):
 
 
 @app.post("/api/delete/scrape_news")
-async def delete_scraped_news(request: Request):
+async def delete_scraped_news(request: Request):    
     request_body = await request.body()
     data = json.loads(request_body)
     api_res = ApiRes()
+    is_no_more_news = False
 
     # SCRAPED_NEWS id 값으로 해당 객체를 가져옵니다.
     scraped_news_id = data["scraped_news_id"]
@@ -214,6 +181,7 @@ async def delete_scraped_news(request: Request):
 
         if num_scraped_news == 1:
             session.delete(keyword)
+            is_no_more_news = True
         session.delete(scraped_news)
         session.commit()
 
@@ -224,4 +192,5 @@ async def delete_scraped_news(request: Request):
         return api_res
 
     api_res.set_success(True)
+    api_res.update_data({"is_no_more_news":is_no_more_news})
     return api_res
