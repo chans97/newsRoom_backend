@@ -27,14 +27,14 @@ app.add_middleware(
 )
 
 
-@app.get("/api/news/{keyword}")
-def response_crawled_news_list(keyword:str):
+@app.get("/api/news/{keyword}/{start}")
+def response_crawled_news_list(keyword:str,start:int):
  
     api_res = ApiRes()
     result=''
 
     try:
-        result = crawling_news(keyword)
+        result = crawling_news(keyword,start)
     except Exception as e:
         print(e)
         api_res.set_success(False)
@@ -45,7 +45,7 @@ def response_crawled_news_list(keyword:str):
 
 
 @app.post("/api/login")
-async def login(equest: Request):
+async def login(request: Request):
 
     api_res = ApiRes()
     request_body = await request.body()
@@ -65,6 +65,8 @@ async def login(equest: Request):
             )
             session.add(newsroom_user)
             session.commit()
+            newsroom_user = session.query(NEWSROOM_USER).filter_by(company_id=company_id).first()
+        
 
     except Exception as e: 
         print(e)
