@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import engineconn
 from models import NEWSROOM_USER,SCRAPE_KEYWORD,SCRAPED_NEWS
 from apiRes import ApiRes
-from crawling_news import crawling_news
+from crawling_news import crawling_news, crawling_recently_news
 from utils.parse_datetime_str import parse_datetime_str
 import os
 from dotenv import load_dotenv
@@ -65,6 +65,21 @@ def response_crawled_news_list(keyword:str,start:int):
     api_res.update_data({"result":result})
     return api_res
 
+@app.get("/api/news/recently/{keyword}/{start}")
+def response_crawled_news_list(keyword:str,start:int):
+ 
+    api_res = ApiRes()
+    result=''
+
+    try:
+        result = crawling_recently_news(keyword,start)
+    except Exception as e:
+        print(e)
+        api_res.set_success(False)
+
+    api_res.set_success(True)
+    api_res.update_data({"result":result})
+    return api_res
 
 @app.post("/api/login")
 async def login(request: Request):
