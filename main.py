@@ -9,11 +9,28 @@ from models import NEWSROOM_USER,SCRAPE_KEYWORD,SCRAPED_NEWS
 from apiRes import ApiRes
 from crawling_news import crawling_news
 from utils.parse_datetime_str import parse_datetime_str
+import os
+from dotenv import load_dotenv
 
+import sentry_sdk
+from sentry_sdk.integrations.asgi import SentryAsgiMiddleware
+
+load_dotenv()
+
+SENTRY_URL=os.getenv("SENTRY_URL")
 
 #to-do : 무한 스크롤로 다음 페이지까지 다 긁어오기
+sentry_sdk.init(
+     dsn=SENTRY_URL,
+
+    # Set traces_sample_rate to 1.0 to capture 100%
+    # of transactions for performance monitoring.
+    # We recommend adjusting this value in production,
+    traces_sample_rate=1.0,
+)
 
 app = FastAPI()
+app.add_middleware(SentryAsgiMiddleware)
 
 engine = engineconn()
 session = engine.sessionmaker()
@@ -26,6 +43,11 @@ app.add_middleware(
     allow_headers=["*"],	# 허용할 http header 목록을 설정할 수 있으며 Content-Type, Accept, Accept-Language, Content-Language은 항상 허용된다.
 )
 
+@app.get("/sentry-debug")
+async def trigger_error():
+    print("go")
+    division_by_zero = 1 / 0
+    return division_by_zero
 
 @app.get("/api/news/{keyword}/{start}")
 def response_crawled_news_list(keyword:str,start:int):
