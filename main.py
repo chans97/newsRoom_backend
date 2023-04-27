@@ -51,7 +51,6 @@ async def trigger_error():
 
 @app.get("/api/news/{keyword}/{start}")
 def response_crawled_news_list(keyword:str,start:int):
- 
     api_res = ApiRes()
     result=''
 
@@ -66,8 +65,8 @@ def response_crawled_news_list(keyword:str,start:int):
     return api_res
 
 @app.get("/api/news/recently/{keyword}/{start}")
-def response_crawled_news_list(keyword:str,start:int):
- 
+def response_crawled_recently_news_list_(keyword:str,start:int):
+
     api_res = ApiRes()
     result=''
 
